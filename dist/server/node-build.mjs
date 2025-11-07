@@ -395,25 +395,41 @@ function startTelegramBot() {
       bot.answerCallbackQuery(query.id);
     }
   });
-  bot.on("message", (msg) => {
+  bot.on("message", async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from?.id || 0;
     const text = msg.text || "";
     if (text.startsWith("/")) return;
     const state = userState[userId];
     if (!state || !state.platform || !state.editType) return;
+    let linkToSave = "";
+    if (msg.document) {
+      try {
+        const fileLink = await bot.getFileLink(msg.document.file_id);
+        linkToSave = fileLink;
+        bot.sendMessage(chatId, `📥 Файл получен: ${msg.document.file_name}
+🔗 Ссылка: \`${fileLink}\``, { parse_mode: "Markdown" });
+      } catch (error) {
+        bot.sendMessage(chatId, "❌ Ошибка при получении файла. Попробуйте отправить ссылку вместо файла.");
+        return;
+      }
+    } else if (text) {
+      linkToSave = text;
+    } else {
+      return;
+    }
     const links = readPlatformLinks();
     if (!links[state.platform]) {
       links[state.platform] = { web: "", ios: "", android: "" };
     }
-    links[state.platform][state.editType] = text;
+    links[state.platform][state.editType] = linkToSave;
     if (writePlatformLinks(links)) {
       const names = { web: "Web", ios: "iOS", android: "Android APK" };
       bot.sendMessage(
         chatId,
         `✅ *${names[state.editType]} для ${state.platform} сохранена!*
 
-\`${text}\``,
+\`${linkToSave}\``,
         { parse_mode: "Markdown", reply_markup: getPlatformEditMenu(state.platform) }
       );
     } else {
