@@ -160,6 +160,75 @@ const PLATFORMS = [
   "yohohobet",
   "luckypari"
 ];
+const translations = {
+  ru: {
+    welcome: "👋 *Добро пожаловать в LinkZone Admin Bot!*\n\nВыберите язык:",
+    welcomeAdmin: "🔐 Вы авторизованы как администратор.\n\nВыберите действие:",
+    noAccess: "⚠️ У вас нет прав администратора.",
+    chooseAction: "*LinkZone Admin Bot*\n\nВыберите действие:",
+    showAll: "📋 Показать все ссылки",
+    manage: "⚙️ Управление ссылками",
+    delete: "🗑 Удалить платформу",
+    platforms: "🎰 Список платформ",
+    language: "🌐 Язык",
+    back: "◀️ Назад",
+    currentLinks: "📋 *Текущие ссылки платформ:*\n\n",
+    noLinks: "📭 Нет установленных ссылок.",
+    availablePlatforms: "🎰 *Доступные платформы:*\n\n",
+    manageLinks: "⚙️ *Управление ссылками*\n\nВыберите платформу:",
+    deletePlatform: "🗑 *Удалить платформу*\n\nВыберите:",
+    setWeb: "🌐 Установить Web",
+    setIos: "🍎 Установить iOS",
+    setAndroid: "🤖 Установить Android APK",
+    showCurrent: "📋 Показать текущие",
+    sendWebLink: "🌐 *Web ссылка для {platform}*\n\nОтправьте ссылку:",
+    sendIosLink: "🍎 *iOS ссылка для {platform}*\n\nОтправьте ссылку:",
+    sendAndroidLink: "🤖 *Android APK для {platform}*\n\nОтправьте ссылку на APK:",
+    cancel: "❌ Отмена",
+    platformDeleted: "✅ Платформа *{platform}* удалена!",
+    fileReceived: "📥 Файл получен: {filename}\n🔗 Ссылка: `{link}`",
+    fileError: "❌ Ошибка при получении файла. Попробуйте отправить ссылку вместо файла.",
+    linkSaved: "✅ *{type} для {platform} сохранена!*\n\n`{link}`",
+    saveError: "❌ Ошибка при сохранении.",
+    notSet: "❌ не установлено",
+    accessDenied: "⛔ Доступ запрещен",
+    languageChanged: "✅ Язык изменен на Русский"
+  },
+  uz: {
+    welcome: "👋 *LinkZone Admin Botiga xush kelibsiz!*\n\nTilni tanlang:",
+    welcomeAdmin: "🔐 Siz administrator sifatida avtorizatsiya qilindingiz.\n\nAmalni tanlang:",
+    noAccess: "⚠️ Sizda administrator huquqlari yo'q.",
+    chooseAction: "*LinkZone Admin Bot*\n\nAmalni tanlang:",
+    showAll: "📋 Barcha havolalarni ko'rsatish",
+    manage: "⚙️ Havolalarni boshqarish",
+    delete: "🗑 Platformani o'chirish",
+    platforms: "🎰 Platformalar ro'yxati",
+    language: "🌐 Til",
+    back: "◀️ Orqaga",
+    currentLinks: "📋 *Joriy platform havolalari:*\n\n",
+    noLinks: "📭 O'rnatilgan havolalar yo'q.",
+    availablePlatforms: "🎰 *Mavjud platformalar:*\n\n",
+    manageLinks: "⚙️ *Havolalarni boshqarish*\n\nPlatformani tanlang:",
+    deletePlatform: "🗑 *Platformani o'chirish*\n\nTanlang:",
+    setWeb: "🌐 Web o'rnatish",
+    setIos: "🍎 iOS o'rnatish",
+    setAndroid: "🤖 Android APK o'rnatish",
+    showCurrent: "📋 Joriy ko'rsatish",
+    sendWebLink: "🌐 *{platform} uchun Web havola*\n\nHavolani yuboring:",
+    sendIosLink: "🍎 *{platform} uchun iOS havola*\n\nHavolani yuboring:",
+    sendAndroidLink: "🤖 *{platform} uchun Android APK*\n\nAPK havolasini yuboring:",
+    cancel: "❌ Bekor qilish",
+    platformDeleted: "✅ *{platform}* platformasi o'chirildi!",
+    fileReceived: "📥 Fayl qabul qilindi: {filename}\n🔗 Havola: `{link}`",
+    fileError: "❌ Faylni olishda xatolik. Havola yuborishga harakat qiling.",
+    linkSaved: "✅ *{platform} uchun {type} saqlandi!*\n\n`{link}`",
+    saveError: "❌ Saqlashda xatolik.",
+    notSet: "❌ o'rnatilmagan",
+    accessDenied: "⛔ Kirish taqiqlangan",
+    languageChanged: "✅ Til O'zbekchaga o'zgartirildi"
+  }
+};
+const userLanguages = {};
 let botInstance = null;
 function startTelegramBot() {
   if (botInstance) {
@@ -192,16 +261,34 @@ function startTelegramBot() {
       }, 1e3);
     }
   });
+  const getLang = (userId) => userLanguages[userId] || "ru";
+  const t = (userId, key, params) => {
+    const lang = getLang(userId);
+    let text = translations[lang][key];
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, "g"), v);
+      });
+    }
+    return text;
+  };
   const userState = {};
-  const getMainMenu = () => ({
+  const getLanguageMenu = () => ({
     inline_keyboard: [
-      [{ text: "📋 Показать все ссылки", callback_data: "action_list" }],
-      [{ text: "⚙️ Управление ссылками", callback_data: "action_manage" }],
-      [{ text: "🗑 Удалить платформу", callback_data: "action_delete" }],
-      [{ text: "🎰 Список платформ", callback_data: "action_platforms" }]
+      [{ text: "🇷🇺 Русский", callback_data: "lang_ru" }],
+      [{ text: "🇺🇿 O'zbekcha", callback_data: "lang_uz" }]
     ]
   });
-  const getPlatformKeyboard = (action) => {
+  const getMainMenu = (userId) => ({
+    inline_keyboard: [
+      [{ text: t(userId, "showAll"), callback_data: "action_list" }],
+      [{ text: t(userId, "manage"), callback_data: "action_manage" }],
+      [{ text: t(userId, "delete"), callback_data: "action_delete" }],
+      [{ text: t(userId, "platforms"), callback_data: "action_platforms" }],
+      [{ text: t(userId, "language"), callback_data: "action_language" }]
+    ]
+  });
+  const getPlatformKeyboard = (action, userId) => {
     const keyboard = [];
     for (let i = 0; i < PLATFORMS.length; i += 3) {
       const row = PLATFORMS.slice(i, i + 3).map((platform) => ({
@@ -210,60 +297,94 @@ function startTelegramBot() {
       }));
       keyboard.push(row);
     }
-    keyboard.push([{ text: "◀️ Назад", callback_data: "back_main" }]);
+    keyboard.push([{ text: t(userId, "back"), callback_data: "back_main" }]);
     return { inline_keyboard: keyboard };
   };
-  const getPlatformEditMenu = (platform) => {
-    const links = readPlatformLinks();
-    links[platform] || {};
+  const getPlatformEditMenu = (platform, userId) => {
     return {
       inline_keyboard: [
-        [{ text: "🌐 Установить Web", callback_data: `edit_web_${platform}` }],
-        [{ text: "🍎 Установить iOS", callback_data: `edit_ios_${platform}` }],
-        [{ text: "🤖 Установить Android APK", callback_data: `edit_android_${platform}` }],
-        [{ text: "📋 Показать текущие", callback_data: `show_${platform}` }],
-        [{ text: "◀️ Назад", callback_data: "action_manage" }]
+        [{ text: t(userId, "setWeb"), callback_data: `edit_web_${platform}` }],
+        [{ text: t(userId, "setIos"), callback_data: `edit_ios_${platform}` }],
+        [{ text: t(userId, "setAndroid"), callback_data: `edit_android_${platform}` }],
+        [{ text: t(userId, "showCurrent"), callback_data: `show_${platform}` }],
+        [{ text: t(userId, "back"), callback_data: "action_manage" }]
       ]
     };
   };
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from?.id || 0;
-    let message = "👋 *Добро пожаловать в LinkZone Admin Bot!*\n\n";
-    if (isAdmin(userId)) {
-      message += "🔐 Вы авторизованы как администратор.\n\nВыберите действие:";
-      bot.sendMessage(chatId, message, { parse_mode: "Markdown", reply_markup: getMainMenu() });
-    } else {
-      message += "⚠️ У вас нет прав администратора.";
-      bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+    if (!isAdmin(userId)) {
+      bot.sendMessage(chatId, t(userId, "welcome"), {
+        parse_mode: "Markdown",
+        reply_markup: getLanguageMenu()
+      });
+      return;
     }
-  });
-  bot.onText(/\/help/, (msg) => {
-    bot.sendMessage(msg.chat.id, "👋 Используйте /start для начала работы", { reply_markup: getMainMenu() });
+    if (!userLanguages[userId]) {
+      bot.sendMessage(chatId, t(userId, "welcome"), {
+        parse_mode: "Markdown",
+        reply_markup: getLanguageMenu()
+      });
+    } else {
+      bot.sendMessage(chatId, t(userId, "welcomeAdmin"), {
+        parse_mode: "Markdown",
+        reply_markup: getMainMenu(userId)
+      });
+    }
   });
   bot.on("callback_query", async (query) => {
     const chatId = query.message.chat.id;
     const userId = query.from.id;
     const data = query.data;
     const messageId = query.message.message_id;
-    if (!isAdmin(userId)) {
-      bot.answerCallbackQuery(query.id, { text: "⛔ Доступ запрещен", show_alert: true });
+    if (data.startsWith("lang_")) {
+      const lang = data.replace("lang_", "");
+      userLanguages[userId] = lang;
+      if (!isAdmin(userId)) {
+        bot.editMessageText(t(userId, "noAccess"), {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown"
+        });
+        bot.answerCallbackQuery(query.id);
+        return;
+      }
+      bot.editMessageText(t(userId, "welcomeAdmin"), {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: getMainMenu(userId)
+      });
+      bot.answerCallbackQuery(query.id, { text: t(userId, "languageChanged") });
       return;
     }
-    if (data === "action_list") {
+    if (!isAdmin(userId)) {
+      bot.answerCallbackQuery(query.id, { text: t(userId, "accessDenied"), show_alert: true });
+      return;
+    }
+    if (data === "action_language") {
+      bot.editMessageText(t(userId, "welcome"), {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: getLanguageMenu()
+      });
+      bot.answerCallbackQuery(query.id);
+    } else if (data === "action_list") {
       const links = readPlatformLinks();
-      let message = "📋 *Текущие ссылки платформ:*\n\n";
+      let message = t(userId, "currentLinks");
       if (Object.keys(links).length === 0) {
-        message = "📭 Нет установленных ссылок.";
+        message = t(userId, "noLinks");
       } else {
         for (const [platform, urls] of Object.entries(links)) {
           message += `*${platform.toUpperCase()}*
 `;
-          message += `🌐 Web: ${urls.web || "❌"}
+          message += `🌐 Web: ${urls.web || t(userId, "notSet")}
 `;
-          message += `🍎 iOS: ${urls.ios || "❌"}
+          message += `🍎 iOS: ${urls.ios || t(userId, "notSet")}
 `;
-          message += `🤖 Android: ${urls.android || "❌"}
+          message += `🤖 Android: ${urls.android || t(userId, "notSet")}
 
 `;
         }
@@ -272,125 +393,117 @@ function startTelegramBot() {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "◀️ Назад", callback_data: "back_main" }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "back"), callback_data: "back_main" }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data === "action_platforms") {
-      let message = "🎰 *Доступные платформы:*\n\n";
+      let message = t(userId, "availablePlatforms");
       PLATFORMS.forEach((p, i) => message += `${i + 1}. ${p}
 `);
       bot.editMessageText(message, {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "◀️ Назад", callback_data: "back_main" }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "back"), callback_data: "back_main" }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data === "action_manage") {
-      bot.editMessageText("⚙️ *Управление ссылками*\n\nВыберите платформу:", {
+      bot.editMessageText(t(userId, "manageLinks"), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: getPlatformKeyboard("manage")
+        reply_markup: getPlatformKeyboard("manage", userId)
       });
       bot.answerCallbackQuery(query.id);
     } else if (data === "action_delete") {
-      bot.editMessageText("🗑 *Удалить платформу*\n\nВыберите:", {
+      bot.editMessageText(t(userId, "deletePlatform"), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: getPlatformKeyboard("delete")
+        reply_markup: getPlatformKeyboard("delete", userId)
       });
       bot.answerCallbackQuery(query.id);
     } else if (data === "back_main") {
       delete userState[userId];
-      bot.editMessageText("*LinkZone Admin Bot*\n\nВыберите действие:", {
+      bot.editMessageText(t(userId, "chooseAction"), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: getMainMenu()
+        reply_markup: getMainMenu(userId)
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("manage_")) {
       const platform = data.replace("manage_", "");
       const links = readPlatformLinks();
       const pl = links[platform] || { web: "", ios: "", android: "" };
-      let message = `⚙️ *Управление: ${platform.toUpperCase()}*
+      let message = `⚙️ *${t(userId, "manage")}: ${platform.toUpperCase()}*
 
 `;
-      message += `🌐 Web: ${pl.web || "❌ не установлено"}
+      message += `🌐 Web: ${pl.web || t(userId, "notSet")}
 `;
-      message += `🍎 iOS: ${pl.ios || "❌ не установлено"}
+      message += `🍎 iOS: ${pl.ios || t(userId, "notSet")}
 `;
-      message += `🤖 Android: ${pl.android || "❌ не установлено"}
-
+      message += `🤖 Android: ${pl.android || t(userId, "notSet")}
 `;
-      message += "Выберите что установить:";
       bot.editMessageText(message, {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: getPlatformEditMenu(platform)
+        reply_markup: getPlatformEditMenu(platform, userId)
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("show_")) {
       const platform = data.replace("show_", "");
       const links = readPlatformLinks();
       const pl = links[platform] || { web: "", ios: "", android: "" };
-      let message = `📋 *${platform.toUpperCase()} - Текущие ссылки:*
+      let message = `📋 *${platform.toUpperCase()}*
 
 `;
       message += `🌐 Web:
-\`${pl.web || "не установлено"}\`
+\`${pl.web || t(userId, "notSet")}\`
 
 `;
       message += `🍎 iOS:
-\`${pl.ios || "не установлено"}\`
+\`${pl.ios || t(userId, "notSet")}\`
 
 `;
       message += `🤖 Android:
-\`${pl.android || "не установлено"}\``;
+\`${pl.android || t(userId, "notSet")}\``;
       bot.editMessageText(message, {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "◀️ Назад", callback_data: `manage_${platform}` }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "back"), callback_data: `manage_${platform}` }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("edit_web_")) {
       const platform = data.replace("edit_web_", "");
       userState[userId] = { platform, editType: "web" };
-      bot.editMessageText(`🌐 *Web ссылка для ${platform.toUpperCase()}*
-
-Отправьте ссылку:`, {
+      bot.editMessageText(t(userId, "sendWebLink", { platform: platform.toUpperCase() }), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "❌ Отмена", callback_data: `manage_${platform}` }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "cancel"), callback_data: `manage_${platform}` }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("edit_ios_")) {
       const platform = data.replace("edit_ios_", "");
       userState[userId] = { platform, editType: "ios" };
-      bot.editMessageText(`🍎 *iOS ссылка для ${platform.toUpperCase()}*
-
-Отправьте ссылку:`, {
+      bot.editMessageText(t(userId, "sendIosLink", { platform: platform.toUpperCase() }), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "❌ Отмена", callback_data: `manage_${platform}` }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "cancel"), callback_data: `manage_${platform}` }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("edit_android_")) {
       const platform = data.replace("edit_android_", "");
       userState[userId] = { platform, editType: "android" };
-      bot.editMessageText(`🤖 *Android APK для ${platform.toUpperCase()}*
-
-Отправьте ссылку на APK:`, {
+      bot.editMessageText(t(userId, "sendAndroidLink", { platform: platform.toUpperCase() }), {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "❌ Отмена", callback_data: `manage_${platform}` }]] }
+        reply_markup: { inline_keyboard: [[{ text: t(userId, "cancel"), callback_data: `manage_${platform}` }]] }
       });
       bot.answerCallbackQuery(query.id);
     } else if (data.startsWith("delete_")) {
@@ -399,17 +512,13 @@ function startTelegramBot() {
       if (links[platform]) {
         delete links[platform];
         if (writePlatformLinks(links)) {
-          bot.editMessageText(`✅ Платформа *${platform}* удалена!`, {
+          bot.editMessageText(t(userId, "platformDeleted", { platform }), {
             chat_id: chatId,
             message_id: messageId,
             parse_mode: "Markdown",
-            reply_markup: { inline_keyboard: [[{ text: "◀️ Назад", callback_data: "back_main" }]] }
+            reply_markup: { inline_keyboard: [[{ text: t(userId, "back"), callback_data: "back_main" }]] }
           });
-        } else {
-          bot.answerCallbackQuery(query.id, { text: "❌ Ошибка", show_alert: true });
         }
-      } else {
-        bot.answerCallbackQuery(query.id, { text: `⚠️ Не найдена`, show_alert: true });
       }
       bot.answerCallbackQuery(query.id);
     }
@@ -428,10 +537,9 @@ function startTelegramBot() {
         const fileLink = await bot.getFileLink(msg.document.file_id);
         linkToSave = fileLink;
         fileName = msg.document.file_name || "";
-        bot.sendMessage(chatId, `📥 Файл получен: ${msg.document.file_name}
-🔗 Ссылка: \`${fileLink}\``, { parse_mode: "Markdown" });
+        bot.sendMessage(chatId, t(userId, "fileReceived", { filename: msg.document.file_name || "", link: fileLink }), { parse_mode: "Markdown" });
       } catch (error) {
-        bot.sendMessage(chatId, "❌ Ошибка при получении файла. Попробуйте отправить ссылку вместо файла.");
+        bot.sendMessage(chatId, t(userId, "fileError"));
         return;
       }
     } else if (text) {
@@ -451,13 +559,11 @@ function startTelegramBot() {
       const names = { web: "Web", ios: "iOS", android: "Android APK" };
       bot.sendMessage(
         chatId,
-        `✅ *${names[state.editType]} для ${state.platform} сохранена!*
-
-\`${linkToSave}\``,
-        { parse_mode: "Markdown", reply_markup: getPlatformEditMenu(state.platform) }
+        t(userId, "linkSaved", { type: names[state.editType], platform: state.platform, link: linkToSave }),
+        { parse_mode: "Markdown", reply_markup: getPlatformEditMenu(state.platform, userId) }
       );
     } else {
-      bot.sendMessage(chatId, "❌ Ошибка при сохранении.");
+      bot.sendMessage(chatId, t(userId, "saveError"));
     }
     delete userState[userId];
   });
