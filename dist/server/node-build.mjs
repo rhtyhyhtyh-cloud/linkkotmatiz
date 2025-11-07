@@ -4,6 +4,7 @@ import * as express from "express";
 import express__default, { Router } from "express";
 import cors from "cors";
 import fs from "fs";
+import https from "https";
 import TelegramBot from "node-telegram-bot-api";
 const handleDemo = (req, res) => {
   const response = {
@@ -87,6 +88,24 @@ router.delete("/api/platform-links/:platformId", (req, res) => {
   } else {
     res.status(404).json({ error: "Platform not found" });
   }
+});
+router.get("/api/download-apk/:platformId", (req, res) => {
+  const { platformId } = req.params;
+  const links = readPlatformLinks$1();
+  const platformData = links[platformId];
+  if (!platformData || !platformData.android) {
+    return res.status(404).json({ error: "APK not found" });
+  }
+  const apkUrl = platformData.android;
+  const fileName = platformData.androidFileName || `${platformId}.apk`;
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.setHeader("Content-Type", "application/vnd.android.package-archive");
+  https.get(apkUrl, (fileStream) => {
+    fileStream.pipe(res);
+  }).on("error", (error) => {
+    console.error("Error downloading APK:", error);
+    res.status(500).json({ error: "Failed to download APK" });
+  });
 });
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const ADMIN_USERS = (process.env.TELEGRAM_ADMIN_IDS || "").split(",").map((id) => parseInt(id.trim()));
