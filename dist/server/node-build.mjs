@@ -403,10 +403,12 @@ function startTelegramBot() {
     const state = userState[userId];
     if (!state || !state.platform || !state.editType) return;
     let linkToSave = "";
+    let fileName = "";
     if (msg.document) {
       try {
         const fileLink = await bot.getFileLink(msg.document.file_id);
         linkToSave = fileLink;
+        fileName = msg.document.file_name || "";
         bot.sendMessage(chatId, `📥 Файл получен: ${msg.document.file_name}
 🔗 Ссылка: \`${fileLink}\``, { parse_mode: "Markdown" });
       } catch (error) {
@@ -423,6 +425,9 @@ function startTelegramBot() {
       links[state.platform] = { web: "", ios: "", android: "" };
     }
     links[state.platform][state.editType] = linkToSave;
+    if (state.editType === "android" && fileName) {
+      links[state.platform].androidFileName = fileName;
+    }
     if (writePlatformLinks(links)) {
       const names = { web: "Web", ios: "iOS", android: "Android APK" };
       bot.sendMessage(
