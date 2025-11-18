@@ -189,24 +189,47 @@ export default function Index() {
       // Вместо прямой ссылки открываем через наш сервер
       const proxyUrl = `/api/redirect/${platformId}/${type}`;
 
-      // Для Android - открываем через proxy
-      if (isAndroid) {
-        window.location.href = proxyUrl;
-      }
-      // Для iOS в Telegram - также используем proxy для надежности
-      else if (isIOS && isTelegram) {
-        // В Telegram на iOS тоже могут быть блокировки
-        window.location.href = proxyUrl;
-      }
-      // Для остальных случаев (iOS Safari, Desktop) - можно напрямую
-      else {
-        const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      // Для всех платформ пробуем открыть в новом окне через proxy
+      let opened = false;
+
+      // Попытка 1: Открыть в новом окне через window.open
+      try {
+        const newWindow = window.open(proxyUrl, '_blank', 'noopener,noreferrer');
         if (newWindow) {
+          opened = true;
           newWindow.focus();
-        } else {
-          // Если window.open заблокирован - используем proxy
-          window.location.href = proxyUrl;
         }
+      } catch (e) {
+        console.log('window.open proxy failed');
+      }
+
+      // Попытка 2: Создаем невидимую ссылку и кликаем (откроется в новой вкладке)
+      if (!opened) {
+        try {
+          const link = document.createElement('a');
+          link.href = proxyUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+
+          setTimeout(() => {
+            if (document.body.contains(link)) {
+              document.body.removeChild(link);
+            }
+          }, 100);
+
+          opened = true;
+        } catch (e) {
+          console.log('link click proxy failed');
+        }
+      }
+
+      // Попытка 3: Последняя попытка - прямой переход (уходим со страницы)
+      // Используем только если ничего не сработало
+      if (!opened) {
+        window.location.href = proxyUrl;
       }
     }
   };
