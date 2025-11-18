@@ -180,24 +180,70 @@ export default function Index() {
       const timestamp = Date.now();
       window.location.href = `/api/download-apk/${platformId}?t=${timestamp}`;
     } else {
-      // ИСПРАВЛЕНИЕ #4: Универсальное открытие ссылок для всех платформ
+      // ИСПРАВЛЕНИЕ #4: Агрессивное открытие ссылок (в том числе реферальных)
       const isAndroid = /Android/i.test(window.navigator.userAgent);
       const isTelegram = window.navigator.userAgent.includes('Telegram');
       const isIOS = /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
 
-      // Для Android - используем прямое перенаправление
-      // Это работает надежнее чем window.open на Android
+      // Для Android - множественные попытки открытия
       if (isAndroid) {
-        // Сохраняем текущую страницу в истории перед переходом
-        window.location.href = url;
+        let opened = false;
+
+        // Попытка 1: window.open
+        try {
+          const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+          if (newWindow) {
+            opened = true;
+            newWindow.focus();
+          }
+        } catch (e) {
+          console.log('window.open failed');
+        }
+
+        // Попытка 2: Создаем ссылку и кликаем
+        if (!opened) {
+          try {
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+
+            const clickEvent = new MouseEvent('click', {
+              view: window,
+              bubbles: true,
+              cancelable: true
+            });
+
+            link.dispatchEvent(clickEvent);
+            opened = true;
+
+            setTimeout(() => {
+              if (document.body.contains(link)) {
+                document.body.removeChild(link);
+              }
+            }, 100);
+          } catch (e) {
+            console.log('link click failed');
+          }
+        }
+
+        // Попытка 3: Прямой переход (гарантированно откроется)
+        if (!opened) {
+          window.location.href = url;
+        }
       }
       // Для iOS в Telegram используем специальный API
       else if (isIOS && isTelegram && window.Telegram?.WebApp) {
         window.Telegram.WebApp.openLink(url);
       }
-      // Для остальных случаев (iOS Safari, Desktop) - window.open
+      // Для остальных случаев (iOS Safari, Desktop)
       else {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+        if (newWindow) {
+          newWindow.focus();
+        }
       }
     }
   };
