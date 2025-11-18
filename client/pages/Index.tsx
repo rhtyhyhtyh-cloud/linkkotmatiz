@@ -167,7 +167,7 @@ export default function Index() {
       });
   }, []);
 
-  // ИСПРАВЛЕНИЕ #3: Улучшенная обработка открытия ссылок для всех платформ
+  // ИСПРАВЛЕНИЕ #3: Топовая обработка открытия ссылок с Telegram WebApp API
   const handlePlatformClick = (platformId: string, type: 'web' | 'ios' | 'android') => {
     const links = platformLinks[platformId];
     if (!links) return;
@@ -179,58 +179,54 @@ export default function Index() {
       // Use proxy endpoint for APK download with cache-busting timestamp
       const timestamp = Date.now();
       window.location.href = `/api/download-apk/${platformId}?t=${timestamp}`;
-    } else {
-      // ИСПРАВЛЕНИЕ #4 + #5: Обход блокировок через proxy редирект
-      const isAndroid = /Android/i.test(window.navigator.userAgent);
-      const isTelegram = window.navigator.userAgent.includes('Telegram');
-      const isIOS = /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+      return;
+    }
 
-      // Используем proxy редирект для обхода блокировок Telegram/провайдера
-      // Вместо прямой ссылки открываем через наш сервер
-      const proxyUrl = `/api/redirect/${platformId}/${type}`;
+    // Проверяем запущено ли в Telegram
+    const isTelegram = window.navigator.userAgent.includes('Telegram');
 
-      // Для всех платформ пробуем открыть в новом окне через proxy
-      let opened = false;
-
-      // Попытка 1: Открыть в новом окне через window.open
+    if (isTelegram && window.Telegram?.WebApp) {
+      // TELEGRAM WEBAPP API - это единственный способ надежно открывать ссылки в Telegram
       try {
-        const newWindow = window.open(proxyUrl, '_blank', 'noopener,noreferrer');
-        if (newWindow) {
-          opened = true;
-          newWindow.focus();
-        }
+        // openLink открывает URL во внешнем браузере (Chrome/Safari)
+        // Это обходит блокировки Telegram WebView
+        window.Telegram.WebApp.openLink(url);
+        return;
       } catch (e) {
-        console.log('window.open proxy failed');
+        console.error('Telegram WebApp API failed:', e);
       }
+    }
 
-      // Попытка 2: Создаем невидимую ссылку и кликаем (откроется в новой вкладке)
-      if (!opened) {
-        try {
-          const link = document.createElement('a');
-          link.href = proxyUrl;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
+    // Fallback для обычных браузеров
+    try {
+      // Способ 1: window.open в новой вкладке
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+      if (newWindow) {
+        newWindow.focus();
+        return;
+      }
+    } catch (e) {
+      console.error('window.open failed:', e);
+    }
 
-          setTimeout(() => {
-            if (document.body.contains(link)) {
-              document.body.removeChild(link);
-            }
-          }, 100);
-
-          opened = true;
-        } catch (e) {
-          console.log('link click proxy failed');
+    // Способ 2: Создаем ссылку и кликаем
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
         }
-      }
-
-      // Попытка 3: Последняя попытка - прямой переход (уходим со страницы)
-      // Используем только если ничего не сработало
-      if (!opened) {
-        window.location.href = proxyUrl;
-      }
+      }, 100);
+    } catch (e) {
+      console.error('link click failed:', e);
+      // Последняя попытка - прямой переход
+      window.location.href = url;
     }
   };
 

@@ -102,8 +102,8 @@ router.get('/api/download-apk/:platformId', (req, res) => {
   });
 });
 
-// ИСПРАВЛЕНИЕ #5: Умный редирект - получаем финальный URL через сервер
-// Решает проблему блокировки lb-aff.com на Android
+// ИСПРАВЛЕНИЕ #5: Двухэтапный редирект для полного обхода блокировки
+// Сначала переходим на промежуточную страницу на нашем домене, потом на целевую
 router.get('/api/redirect/:platformId/:linkType', (req, res) => {
   const { platformId, linkType } = req.params;
   const links = readPlatformLinks();
@@ -119,131 +119,113 @@ router.get('/api/redirect/:platformId/:linkType', (req, res) => {
     return res.status(404).send('Link not found');
   }
 
-  // Если это lb-aff.com редирект-ссылка, получаем финальный URL через сервер
-  if (targetUrl.includes('lb-aff.com')) {
-    // Функция для следования редиректам
-    const followRedirects = (url: string, callback: (finalUrl: string) => void, maxRedirects = 10) => {
-      if (maxRedirects === 0) {
-        callback(url);
-        return;
-      }
-
-      https.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-        }
-      }, (response) => {
-        // Проверяем статус редиректа
-        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          const redirectUrl = response.headers.location;
-          console.log(`Redirect: ${url} -> ${redirectUrl}`);
-          followRedirects(redirectUrl, callback, maxRedirects - 1);
-        } else {
-          // Это финальный URL
-          callback(url);
-        }
-
-        // Закрываем соединение
-        response.destroy();
-      }).on('error', (error) => {
-        console.error('Error following redirect:', error);
-        callback(url);
-      });
-    };
-
-    // Получаем финальный URL
-    followRedirects(targetUrl, (finalUrl) => {
-      console.log(`Final URL resolved: ${targetUrl} -> ${finalUrl}`);
-      sendRedirectPage(res, finalUrl);
-    });
-  } else {
-    // Для обычных ссылок просто редиректим
-    sendRedirectPage(res, targetUrl);
-  }
-});
-
-// Функция для отправки редирект-страницы
-function sendRedirectPage(res: any, finalUrl: string) {
-  const encodedUrl = Buffer.from(finalUrl).toString('base64');
+  // Кодируем URL в base64
+  const encodedUrl = Buffer.from(targetUrl).toString('base64');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="robots" content="noindex, nofollow">
-      <title>Загрузка...</title>
-      <style>
-        body {
-          margin: 0;
-          padding: 0;
-          background: #0A0F1C;
-          overflow: hidden;
-        }
-        #loader {
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          color: #00d9ff;
-          font-family: sans-serif;
-          text-align: center;
-        }
-        .spinner {
-          width: 50px;
-          height: 50px;
-          border: 3px solid rgba(0, 217, 255, 0.3);
-          border-radius: 50%;
-          border-top-color: #00d9ff;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 20px;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      </style>
-    </head>
-    <body>
-      <div id="loader">
-        <div class="spinner"></div>
-        <p>Переход на сайт...</p>
-      </div>
-      <script>
-        (function() {
-          var encoded = "${encodedUrl}";
-          var url = atob(encoded);
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
-          // Мгновенный редирект через несколько методов
-          try {
-            // Способ 1: Прямой редирект
-            window.location.replace(url);
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Redirecting...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0A0F1C;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .container {
+      text-align: center;
+      padding: 20px;
+    }
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(0, 217, 255, 0.2);
+      border-radius: 50%;
+      border-top-color: #00d9ff;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .text {
+      color: #00d9ff;
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .subtext {
+      color: #6B8299;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <div class="text">Подключение...</div>
+    <div class="subtext">Пожалуйста, подождите</div>
+  </div>
+  <script>
+    (function() {
+      // Декодируем URL
+      var b64 = "${encodedUrl}";
+      var url = atob(b64);
 
-            // Способ 2: Через href (fallback)
-            setTimeout(function() {
-              window.location.href = url;
-            }, 100);
+      // Определяем платформу
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      var isTelegram = navigator.userAgent.includes('Telegram');
 
-            // Способ 3: Создаем ссылку и кликаем
-            setTimeout(function() {
-              var a = document.createElement('a');
-              a.href = url;
-              a.style.display = 'none';
-              document.body.appendChild(a);
-              a.click();
-            }, 200);
-
-          } catch (e) {
-            // Fallback - показываем кликабельную ссылку
-            document.getElementById('loader').innerHTML =
-              '<p>Нажмите <a href="' + url + '" style="color: #00d9ff; text-decoration: underline;">здесь</a> для продолжения</p>';
+      // Функция редиректа
+      function redirect() {
+        try {
+          // Метод 1: Для Telegram WebApp используем специальный API
+          if (isTelegram && window.Telegram && window.Telegram.WebApp) {
+            try {
+              window.Telegram.WebApp.openLink(url);
+              return;
+            } catch(e) {}
           }
-        })();
-      </script>
-    </body>
-    </html>
-  `);
-}
+
+          // Метод 2: Стандартный редирект через location
+          window.location.href = url;
+
+          // Метод 3: Fallback через replace
+          setTimeout(function() {
+            window.location.replace(url);
+          }, 100);
+
+          // Метод 4: Fallback через assign
+          setTimeout(function() {
+            window.location.assign(url);
+          }, 200);
+
+        } catch(e) {
+          // Последняя попытка - показываем ссылку
+          document.body.innerHTML = '<div style="text-align:center;padding:40px;color:#00d9ff;font-family:sans-serif;"><p style="margin-bottom:20px;">Нажмите на ссылку для продолжения:</p><a href="' + url + '" style="color:#00d9ff;font-size:18px;text-decoration:underline;">Перейти на сайт</a></div>';
+        }
+      }
+
+      // Задержка перед редиректом для загрузки страницы
+      setTimeout(redirect, 500);
+    })();
+  </script>
+</body>
+</html>`);
+});
 
 export default router;
