@@ -102,4 +102,113 @@ router.get('/api/download-apk/:platformId', (req, res) => {
   });
 });
 
+// ИСПРАВЛЕНИЕ #5: Redirect proxy для обхода блокировок Telegram/провайдера
+// Перенаправляет через наш сервер для обхода блокировок реферальных ссылок
+router.get('/api/redirect/:platformId/:linkType', (req, res) => {
+  const { platformId, linkType } = req.params;
+  const links = readPlatformLinks();
+  const platformData = links[platformId];
+
+  if (!platformData) {
+    return res.status(404).send('Platform not found');
+  }
+
+  const targetUrl = platformData[linkType as 'web' | 'ios' | 'android'];
+
+  if (!targetUrl) {
+    return res.status(404).send('Link not found');
+  }
+
+  // Редирект через HTML meta refresh для обхода блокировок
+  // Это работает даже когда Telegram блокирует прямые редиректы
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta http-equiv="refresh" content="0;url=${targetUrl}">
+      <meta name="robots" content="noindex, nofollow">
+      <title>Redirecting...</title>
+      <style>
+        body {
+          margin: 0;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: #0A0F1C;
+          color: #00d9ff;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          text-align: center;
+        }
+        .loader {
+          display: inline-block;
+          width: 50px;
+          height: 50px;
+          border: 3px solid rgba(0, 217, 255, 0.3);
+          border-radius: 50%;
+          border-top-color: #00d9ff;
+          animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        h1 {
+          margin-top: 20px;
+          font-size: 24px;
+          font-weight: 600;
+        }
+        p {
+          margin-top: 10px;
+          color: #8899aa;
+          font-size: 14px;
+        }
+      </style>
+      <script>
+        // Множественные методы редиректа для максимальной совместимости
+        setTimeout(function() {
+          // Метод 1: window.location
+          try {
+            window.location.href = "${targetUrl}";
+          } catch (e) {
+            console.log("Method 1 failed");
+          }
+
+          // Метод 2: window.location.replace (не добавляет в историю)
+          setTimeout(function() {
+            try {
+              window.location.replace("${targetUrl}");
+            } catch (e) {
+              console.log("Method 2 failed");
+            }
+          }, 100);
+
+          // Метод 3: Создаем и кликаем по ссылке
+          setTimeout(function() {
+            try {
+              var a = document.createElement('a');
+              a.href = "${targetUrl}";
+              a.target = '_self';
+              document.body.appendChild(a);
+              a.click();
+            } catch (e) {
+              console.log("Method 3 failed");
+            }
+          }, 200);
+        }, 100);
+      </script>
+    </head>
+    <body>
+      <div>
+        <div class="loader"></div>
+        <h1>Перенаправление...</h1>
+        <p>Если не перенаправило автоматически, <a href="${targetUrl}" style="color: #00d9ff;">нажмите здесь</a></p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 export default router;

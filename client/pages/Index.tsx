@@ -180,69 +180,32 @@ export default function Index() {
       const timestamp = Date.now();
       window.location.href = `/api/download-apk/${platformId}?t=${timestamp}`;
     } else {
-      // ИСПРАВЛЕНИЕ #4: Агрессивное открытие ссылок (в том числе реферальных)
+      // ИСПРАВЛЕНИЕ #4 + #5: Обход блокировок через proxy редирект
       const isAndroid = /Android/i.test(window.navigator.userAgent);
       const isTelegram = window.navigator.userAgent.includes('Telegram');
       const isIOS = /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
 
-      // Для Android - множественные попытки открытия
+      // Используем proxy редирект для обхода блокировок Telegram/провайдера
+      // Вместо прямой ссылки открываем через наш сервер
+      const proxyUrl = `/api/redirect/${platformId}/${type}`;
+
+      // Для Android - открываем через proxy
       if (isAndroid) {
-        let opened = false;
-
-        // Попытка 1: window.open
-        try {
-          const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-          if (newWindow) {
-            opened = true;
-            newWindow.focus();
-          }
-        } catch (e) {
-          console.log('window.open failed');
-        }
-
-        // Попытка 2: Создаем ссылку и кликаем
-        if (!opened) {
-          try {
-            const link = document.createElement('a');
-            link.href = url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.style.display = 'none';
-            document.body.appendChild(link);
-
-            const clickEvent = new MouseEvent('click', {
-              view: window,
-              bubbles: true,
-              cancelable: true
-            });
-
-            link.dispatchEvent(clickEvent);
-            opened = true;
-
-            setTimeout(() => {
-              if (document.body.contains(link)) {
-                document.body.removeChild(link);
-              }
-            }, 100);
-          } catch (e) {
-            console.log('link click failed');
-          }
-        }
-
-        // Попытка 3: Прямой переход (гарантированно откроется)
-        if (!opened) {
-          window.location.href = url;
-        }
+        window.location.href = proxyUrl;
       }
-      // Для iOS в Telegram используем специальный API
-      else if (isIOS && isTelegram && window.Telegram?.WebApp) {
-        window.Telegram.WebApp.openLink(url);
+      // Для iOS в Telegram - также используем proxy для надежности
+      else if (isIOS && isTelegram) {
+        // В Telegram на iOS тоже могут быть блокировки
+        window.location.href = proxyUrl;
       }
-      // Для остальных случаев (iOS Safari, Desktop)
+      // Для остальных случаев (iOS Safari, Desktop) - можно напрямую
       else {
         const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
         if (newWindow) {
           newWindow.focus();
+        } else {
+          // Если window.open заблокирован - используем proxy
+          window.location.href = proxyUrl;
         }
       }
     }
