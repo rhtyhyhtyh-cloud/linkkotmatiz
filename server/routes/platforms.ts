@@ -102,8 +102,8 @@ router.get('/api/download-apk/:platformId', (req, res) => {
   });
 });
 
-// ИСПРАВЛЕНИЕ #5: Продвинутый редирект для обхода блокировок
-// Использует base64 кодирование и множественные методы обхода
+// ИСПРАВЛЕНИЕ #5: Умный редирект - получаем финальный URL через сервер
+// Решает проблему блокировки lb-aff.com на Android
 router.get('/api/redirect/:platformId/:linkType', (req, res) => {
   const { platformId, linkType } = req.params;
   const links = readPlatformLinks();
@@ -119,8 +119,52 @@ router.get('/api/redirect/:platformId/:linkType', (req, res) => {
     return res.status(404).send('Link not found');
   }
 
-  // Кодируем URL в base64 для обхода простых фильтров
-  const encodedUrl = Buffer.from(targetUrl).toString('base64');
+  // Если это lb-aff.com редирект-ссылка, получаем финальный URL через сервер
+  if (targetUrl.includes('lb-aff.com')) {
+    // Функция для следования редиректам
+    const followRedirects = (url: string, callback: (finalUrl: string) => void, maxRedirects = 10) => {
+      if (maxRedirects === 0) {
+        callback(url);
+        return;
+      }
+
+      https.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+        }
+      }, (response) => {
+        // Проверяем статус редиректа
+        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const redirectUrl = response.headers.location;
+          console.log(`Redirect: ${url} -> ${redirectUrl}`);
+          followRedirects(redirectUrl, callback, maxRedirects - 1);
+        } else {
+          // Это финальный URL
+          callback(url);
+        }
+
+        // Закрываем соединение
+        response.destroy();
+      }).on('error', (error) => {
+        console.error('Error following redirect:', error);
+        callback(url);
+      });
+    };
+
+    // Получаем финальный URL
+    followRedirects(targetUrl, (finalUrl) => {
+      console.log(`Final URL resolved: ${targetUrl} -> ${finalUrl}`);
+      sendRedirectPage(res, finalUrl);
+    });
+  } else {
+    // Для обычных ссылок просто редиректим
+    sendRedirectPage(res, targetUrl);
+  }
+});
+
+// Функция для отправки редирект-страницы
+function sendRedirectPage(res: any, finalUrl: string) {
+  const encodedUrl = Buffer.from(finalUrl).toString('base64');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -130,7 +174,7 @@ router.get('/api/redirect/:platformId/:linkType', (req, res) => {
     <head>
       <meta charset="utf-8">
       <meta name="robots" content="noindex, nofollow">
-      <title>Loading...</title>
+      <title>Загрузка...</title>
       <style>
         body {
           margin: 0;
@@ -164,64 +208,42 @@ router.get('/api/redirect/:platformId/:linkType', (req, res) => {
     <body>
       <div id="loader">
         <div class="spinner"></div>
-        <p>Загрузка...</p>
+        <p>Переход на сайт...</p>
       </div>
       <script>
         (function() {
-          // Декодируем URL из base64
           var encoded = "${encodedUrl}";
           var url = atob(encoded);
 
-          // Метод 1: Создаем невидимый iframe который загружает целевую страницу
-          // Затем перенаправляем основное окно
-          var iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.src = 'about:blank';
-          document.body.appendChild(iframe);
+          // Мгновенный редирект через несколько методов
+          try {
+            // Способ 1: Прямой редирект
+            window.location.replace(url);
 
-          // Небольшая задержка для загрузки iframe
-          setTimeout(function() {
-            try {
-              // Перенаправляем через несколько методов одновременно
+            // Способ 2: Через href (fallback)
+            setTimeout(function() {
+              window.location.href = url;
+            }, 100);
 
-              // Способ 1: Прямое присвоение
-              window.location = url;
+            // Способ 3: Создаем ссылку и кликаем
+            setTimeout(function() {
+              var a = document.createElement('a');
+              a.href = url;
+              a.style.display = 'none';
+              document.body.appendChild(a);
+              a.click();
+            }, 200);
 
-              // Способ 2: Через replace (не добавляет в историю)
-              setTimeout(function() {
-                window.location.replace(url);
-              }, 50);
-
-              // Способ 3: Через href
-              setTimeout(function() {
-                window.location.href = url;
-              }, 100);
-
-              // Способ 4: Через assign
-              setTimeout(function() {
-                window.location.assign(url);
-              }, 150);
-
-              // Способ 5: Создаем ссылку и кликаем
-              setTimeout(function() {
-                var a = document.createElement('a');
-                a.href = url;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-              }, 200);
-
-            } catch (e) {
-              // Если всё не сработало - показываем ссылку
-              document.getElementById('loader').innerHTML =
-                '<p>Нажмите <a href="' + url + '" style="color: #00d9ff;">здесь</a> для продолжения</p>';
-            }
-          }, 100);
+          } catch (e) {
+            // Fallback - показываем кликабельную ссылку
+            document.getElementById('loader').innerHTML =
+              '<p>Нажмите <a href="' + url + '" style="color: #00d9ff; text-decoration: underline;">здесь</a> для продолжения</p>';
+          }
         })();
       </script>
     </body>
     </html>
   `);
-});
+}
 
 export default router;
