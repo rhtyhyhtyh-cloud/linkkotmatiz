@@ -102,8 +102,8 @@ router.get('/api/download-apk/:platformId', (req, res) => {
   });
 });
 
-// ИСПРАВЛЕНИЕ #5: Redirect proxy для обхода блокировок Telegram/провайдера
-// Перенаправляет через наш сервер для обхода блокировок реферальных ссылок
+// ИСПРАВЛЕНИЕ #5: Продвинутый редирект для обхода блокировок
+// Использует base64 кодирование и множественные методы обхода
 router.get('/api/redirect/:platformId/:linkType', (req, res) => {
   const { platformId, linkType } = req.params;
   const links = readPlatformLinks();
@@ -119,93 +119,106 @@ router.get('/api/redirect/:platformId/:linkType', (req, res) => {
     return res.status(404).send('Link not found');
   }
 
-  // Редирект через HTML meta refresh для обхода блокировок
-  // Это работает даже когда Telegram блокирует прямые редиректы
+  // Кодируем URL в base64 для обхода простых фильтров
+  const encodedUrl = Buffer.from(targetUrl).toString('base64');
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.send(`
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <meta http-equiv="refresh" content="0;url=${targetUrl}">
       <meta name="robots" content="noindex, nofollow">
-      <title>Redirecting...</title>
+      <title>Loading...</title>
       <style>
         body {
           margin: 0;
           padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
           background: #0A0F1C;
+          overflow: hidden;
+        }
+        #loader {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
           color: #00d9ff;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-family: sans-serif;
           text-align: center;
         }
-        .loader {
-          display: inline-block;
+        .spinner {
           width: 50px;
           height: 50px;
           border: 3px solid rgba(0, 217, 255, 0.3);
           border-radius: 50%;
           border-top-color: #00d9ff;
-          animation: spin 1s ease-in-out infinite;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 20px;
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
-        h1 {
-          margin-top: 20px;
-          font-size: 24px;
-          font-weight: 600;
-        }
-        p {
-          margin-top: 10px;
-          color: #8899aa;
-          font-size: 14px;
-        }
       </style>
-      <script>
-        // Множественные методы редиректа для максимальной совместимости
-        setTimeout(function() {
-          // Метод 1: window.location
-          try {
-            window.location.href = "${targetUrl}";
-          } catch (e) {
-            console.log("Method 1 failed");
-          }
-
-          // Метод 2: window.location.replace (не добавляет в историю)
-          setTimeout(function() {
-            try {
-              window.location.replace("${targetUrl}");
-            } catch (e) {
-              console.log("Method 2 failed");
-            }
-          }, 100);
-
-          // Метод 3: Создаем и кликаем по ссылке
-          setTimeout(function() {
-            try {
-              var a = document.createElement('a');
-              a.href = "${targetUrl}";
-              a.target = '_self';
-              document.body.appendChild(a);
-              a.click();
-            } catch (e) {
-              console.log("Method 3 failed");
-            }
-          }, 200);
-        }, 100);
-      </script>
     </head>
     <body>
-      <div>
-        <div class="loader"></div>
-        <h1>Перенаправление...</h1>
-        <p>Если не перенаправило автоматически, <a href="${targetUrl}" style="color: #00d9ff;">нажмите здесь</a></p>
+      <div id="loader">
+        <div class="spinner"></div>
+        <p>Загрузка...</p>
       </div>
+      <script>
+        (function() {
+          // Декодируем URL из base64
+          var encoded = "${encodedUrl}";
+          var url = atob(encoded);
+
+          // Метод 1: Создаем невидимый iframe который загружает целевую страницу
+          // Затем перенаправляем основное окно
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = 'about:blank';
+          document.body.appendChild(iframe);
+
+          // Небольшая задержка для загрузки iframe
+          setTimeout(function() {
+            try {
+              // Перенаправляем через несколько методов одновременно
+
+              // Способ 1: Прямое присвоение
+              window.location = url;
+
+              // Способ 2: Через replace (не добавляет в историю)
+              setTimeout(function() {
+                window.location.replace(url);
+              }, 50);
+
+              // Способ 3: Через href
+              setTimeout(function() {
+                window.location.href = url;
+              }, 100);
+
+              // Способ 4: Через assign
+              setTimeout(function() {
+                window.location.assign(url);
+              }, 150);
+
+              // Способ 5: Создаем ссылку и кликаем
+              setTimeout(function() {
+                var a = document.createElement('a');
+                a.href = url;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+              }, 200);
+
+            } catch (e) {
+              // Если всё не сработало - показываем ссылку
+              document.getElementById('loader').innerHTML =
+                '<p>Нажмите <a href="' + url + '" style="color: #00d9ff;">здесь</a> для продолжения</p>';
+            }
+          }, 100);
+        })();
+      </script>
     </body>
     </html>
   `);
