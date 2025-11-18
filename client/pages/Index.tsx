@@ -180,33 +180,23 @@ export default function Index() {
       const timestamp = Date.now();
       window.location.href = `/api/download-apk/${platformId}?t=${timestamp}`;
     } else {
-      // ИСПРАВЛЕНИЕ #4: Telegram на Android требует специальной обработки ссылок
-      // Проверяем, открыт ли сайт в Telegram WebView
-      const isTelegram = window.navigator.userAgent.includes('Telegram');
+      // ИСПРАВЛЕНИЕ #4: Универсальное открытие ссылок для всех платформ
       const isAndroid = /Android/i.test(window.navigator.userAgent);
+      const isTelegram = window.navigator.userAgent.includes('Telegram');
+      const isIOS = /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
 
-      if (isTelegram && isAndroid) {
-        // Для Telegram на Android используем специальный способ открытия
-        try {
-          // Пытаемся открыть через Telegram API
-          if (window.Telegram?.WebApp) {
-            window.Telegram.WebApp.openLink(url);
-          } else {
-            // Fallback: создаем невидимую ссылку с target="_blank"
-            const link = document.createElement('a');
-            link.href = url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }
-        } catch (e) {
-          // Если ничего не сработало, просто открываем в текущем окне
-          window.location.href = url;
-        }
-      } else {
-        // Для обычных браузеров и iOS просто открываем в новой вкладке
+      // Для Android - используем прямое перенаправление
+      // Это работает надежнее чем window.open на Android
+      if (isAndroid) {
+        // Сохраняем текущую страницу в истории перед переходом
+        window.location.href = url;
+      }
+      // Для iOS в Telegram используем специальный API
+      else if (isIOS && isTelegram && window.Telegram?.WebApp) {
+        window.Telegram.WebApp.openLink(url);
+      }
+      // Для остальных случаев (iOS Safari, Desktop) - window.open
+      else {
         window.open(url, '_blank', 'noopener,noreferrer');
       }
     }
