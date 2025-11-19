@@ -182,24 +182,55 @@ export default function Index() {
       return;
     }
 
-    // Проверяем запущено ли в Telegram
+    // Проверяем платформу и браузер
     const isTelegram = window.navigator.userAgent.includes('Telegram');
+    const isAndroid = /Android/i.test(window.navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(window.navigator.userAgent);
 
+    // СПОСОБ 1: Telegram WebApp API (самый надежный для Telegram)
     if (isTelegram && window.Telegram?.WebApp) {
-      // TELEGRAM WEBAPP API - это единственный способ надежно открывать ссылки в Telegram
       try {
-        // openLink открывает URL во внешнем браузере (Chrome/Safari)
-        // Это обходит блокировки Telegram WebView
-        window.Telegram.WebApp.openLink(url);
+        // try_instant_view: false - ПРИНУДИТЕЛЬНО открывает в Chrome/Safari, НЕ в Telegram WebView
+        window.Telegram.WebApp.openLink(url, { try_instant_view: false });
         return;
       } catch (e) {
         console.error('Telegram WebApp API failed:', e);
       }
     }
 
-    // Fallback для обычных браузеров
+    // СПОСОБ 2: Android Intent URL - открывает НАПРЯМУЮ в Chrome
+    if (isAndroid && isTelegram) {
+      try {
+        // Создаем Android Intent URL который ПРИНУДИТЕЛЬНО открывает Chrome
+        const intentUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+
+        const link = document.createElement('a');
+        link.href = intentUrl;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('Opened in Chrome via Intent URL');
+        return;
+      } catch (e) {
+        console.error('Android Intent URL failed:', e);
+      }
+    }
+
+    // СПОСОБ 3: iOS - открываем в Safari через специальную схему
+    if (isIOS && isTelegram) {
+      try {
+        // Для iOS создаем ссылку которая откроется в Safari
+        window.location.href = url;
+        return;
+      } catch (e) {
+        console.error('iOS redirect failed:', e);
+      }
+    }
+
+    // СПОСОБ 4: Fallback для обычных браузеров
     try {
-      // Способ 1: window.open в новой вкладке
       const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
       if (newWindow) {
         newWindow.focus();
@@ -209,7 +240,7 @@ export default function Index() {
       console.error('window.open failed:', e);
     }
 
-    // Способ 2: Создаем ссылку и кликаем
+    // СПОСОБ 5: Последняя попытка - создаем ссылку и кликаем
     try {
       const link = document.createElement('a');
       link.href = url;
@@ -225,7 +256,7 @@ export default function Index() {
       }, 100);
     } catch (e) {
       console.error('link click failed:', e);
-      // Последняя попытка - прямой переход
+      // Совсем последняя попытка
       window.location.href = url;
     }
   };
